@@ -1,12 +1,12 @@
 import sha1 from 'sha1';
 import { v4 as uuidv4 } from 'uuid';
 import dbClient from '../utils/db';
+import decodeBase64 from '../utils/misc';
 import redisClient from '../utils/redis';
 
 async function getConnect(req, res) {
   const auth = req.headers.authorization.split(' ')[1];
-  const buf = Buffer.from(auth, 'base64');
-  const [email, password] = buf.toString('ascii').split(':');
+  const [email, password] = decodeBase64(auth).toString('ascii').split(':');
   const user = await dbClient.getUserByEmail(email);
   if (user && sha1(password) === user.password) {
     const token = uuidv4();
@@ -18,14 +18,8 @@ async function getConnect(req, res) {
 }
 
 async function getDisconnect(req, res) {
-  const token = `auth_${req.headers['x-token']}`;
-  const userId = await redisClient.get(token);
-  if (userId) {
-    await redisClient.del(token);
-    res.status(204).end();
-  } else {
-    res.status(401).json({ error: 'Unauthorized' });
-  }
+  await redisClient.del(req.token);
+  res.status(204).end();
 }
 
 export default {
